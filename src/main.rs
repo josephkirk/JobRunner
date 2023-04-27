@@ -17,12 +17,11 @@ struct JobConfig {
 }
 
 fn read_jobs(job_config_file: String) -> Vec<JobConfig> {
-    // let job_config = format!("{}", job_config_file);
-    let job_config = include_str!("../jobconfig.json");
-    let jobs: Vec<JobConfig> = serde_json::from_str(&job_config).unwrap_or_else(|_| {
-        panic!("Error reading job config file {:?}", job_config_file);
-    });
-    jobs
+    // open the job_config_file in read-only mode and return the content as String  
+    let job_config_content = std::fs::read_to_string(job_config_file).expect("Something went wrong reading the file");
+    // parse the job_config_content as JSON and return a Vec<JobConfig>
+    let jobs: Vec<JobConfig> = serde_json::from_str(&job_config_content).unwrap();
+    return jobs;
 }
 
 #[tokio::main]
