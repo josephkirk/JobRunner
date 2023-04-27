@@ -58,12 +58,30 @@ async fn main() {
         let job_name = job.name;
         let job_schedule = job.schedule.as_str();
         let job_process = job.process;
-        let job_args = job.command;
-        // job_args = job_args
-        //     .replace("./",&format!("/{:?}",cwd))
-        //     .replace(".\\", &format!("\\{:?}",cwd));
+        let mut job_args = job.command;
+
+        // replace the relative paths in job_args with absolute path
+        job_args = job_args.replace("$CWD", cwd_path.to_str().unwrap());
+        job_args = job_args.replace("$HOME", std::env::var("HOME").unwrap().as_str());
+        job_args = job_args.replace("$USER", std::env::var("USER").unwrap().as_str());
+        job_args = job_args.replace("$HOSTNAME", std::env::var("HOSTNAME").unwrap().as_str());
+        job_args = job_args.replace("$HOST", std::env::var("HOST").unwrap().as_str());
+        job_args = job_args.replace("$PATH", std::env::var("PATH").unwrap().as_str());
+        job_args = job_args.replace("$PWD", std::env::var("PWD").unwrap().as_str());
+        job_args = job_args.replace("$SHELL", std::env::var("SHELL").unwrap().as_str());
+        job_args = job_args.replace("$TERM", std::env::var("TERM").unwrap().as_str());
+        job_args = job_args.replace("$USER", std::env::var("USER").unwrap().as_str());
+        job_args = job_args.replace("$USERNAME", std::env::var("USERNAME").unwrap().as_str());
+        job_args = job_args.replace("$USERDOMAIN", std::env::var("USERDOMAIN").unwrap().as_str());
+        job_args = job_args.replace("$USERDOMAIN_ROAMINGPROFILE", std::env::var("USERDOMAIN_ROAMINGPROFILE").unwrap().as_str());
+        job_args = job_args.replace("$USERPROFILE", std::env::var("USERPROFILE").unwrap().as_str());
+        job_args = job_args.replace("$WINDIR", std::env::var("WINDIR").unwrap().as_str());
 
         let job_to_run = Job::new(job_schedule, move |_uuid, _l| {
+
+                // get next tick for job from job_schedule cron expression
+
+                
                 info!("Job {:?} is running with: {:?}", job_name, job_args);
                 let mut command = std::process::Command::new(job_process.clone())
                     .args(job_args.clone().split_whitespace().collect::<Vec<&str>>())
