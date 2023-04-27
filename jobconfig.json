@@ -9,6 +9,6 @@
         "name": "Job2",
         "schedule": "1/10 * * * * *",
         "process": "cmd",
-        "command": "/C echo Hello World 2"
+        "command": "/C call D:/Dev/JobRunner/target/debug/run.bat"
     }
 ]

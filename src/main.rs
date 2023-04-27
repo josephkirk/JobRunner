@@ -1,5 +1,11 @@
+use std::time::Duration;
+use std::process::Stdio;
 use tokio_cron_scheduler::{JobScheduler, Job};
 use serde_derive::{Serialize, Deserialize};
+use log::{info, warn, error, debug};
+use tokio::{time, task};
+use env_logger::Env;
+
 const JOBCONFIGFILE: &str = "jobconfig.json";
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -21,15 +27,24 @@ fn read_jobs(job_config_file: String) -> Vec<JobConfig> {
 
 #[tokio::main]
 async fn main() {
+    let env = Env::default()
+    .filter_or("MY_LOG_LEVEL", "info")
+    .write_style_or("MY_LOG_STYLE", "always");
+
+    env_logger::init_from_env(env);
     let mut cwd_path = std::env::current_dir().unwrap();
+    // let cwd = cwd_path.clone().into_os_string().into_string().unwrap();
     cwd_path.push(JOBCONFIGFILE);
-    let job_config_file = cwd_path.into_os_string().into_string().unwrap();
+    let job_config_file = cwd_path.clone().into_os_string().into_string().unwrap();
     let jobs = read_jobs(job_config_file);
-    println!("Start Job Scheduler for {:?} jobs", jobs.len());
+
+    info!("Start Job Scheduler for {:?} jobs", jobs.len());
     let scheduler = JobScheduler::new().await;
     let mut sched = scheduler.unwrap();
+    
     for job in jobs {
-
+        //               sec  min   hour   day of month   month   day of week   year
+        // let cron_expression = "0   30   9,12,15     1,15       May-Aug  Mon,Wed,Fri  2018/2";
         // let mut job_to_run = Job::new_async("1/4 * * * * *", |uuid, mut l| {
         //     Box::pin(async move {
         //         println!("I run async every 4 seconds id {:?}", uuid);
@@ -45,18 +60,26 @@ async fn main() {
         let job_schedule = job.schedule.as_str();
         let job_process = job.process;
         let job_args = job.command;
+        // job_args = job_args
+        //     .replace("./",&format!("/{:?}",cwd))
+        //     .replace(".\\", &format!("\\{:?}",cwd));
+
         let job_to_run = Job::new(job_schedule, move |_uuid, _l| {
-                
-                
-                
-                println!("Job {:?} is running", job_name);
-                let mut command = std::process::Command::new(job_process.clone());
-                command.args(job_args.clone().split_whitespace().collect::<Vec<&str>>());
-                let output = command.output().expect("failed to execute process");
-                println!("Job {:?} is finished", job_name);
-                println!("Job {:?} stdout: {:?}", job_name, String::from_utf8_lossy(&output.stdout));
-                println!("Job {:?} stderr: {:?}", job_name, String::from_utf8_lossy(&output.stderr));
-            
+                info!("Job {:?} is running with: {:?}", job_name, job_args);
+                let mut command = std::process::Command::new(job_process.clone())
+                    .args(job_args.clone().split_whitespace().collect::<Vec<&str>>())
+                    // .stdin(Stdio::piped())
+                    .stdout(Stdio::piped())
+                    // .stderr(Stdio::piped())
+                    .spawn()
+                    .expect("Fail to execute command");
+                command.wait().expect("failed to wait on child");
+                let output = command.wait_with_output().expect("failed to wait command");
+                info!("Job {:?} is finished", job_name);
+                debug!("Job {:?} stdout: {:?}", job_name, String::from_utf8_lossy(&output.stdout));
+                if output.stderr.len() > 0 {
+                    warn!("Job {:?} stderr: {:?}", job_name, String::from_utf8_lossy(&output.stderr));
+                }            
         })
         .unwrap();
         sched.add(job_to_run).await.unwrap();
@@ -67,12 +90,22 @@ async fn main() {
 
     sched.set_shutdown_handler(Box::new(|| {
         Box::pin(async move {
-          println!("Shut down done");
+          info!("Shut down done");
         })
       }));
   
-    sched.start().await.unwrap();
+    if let Err(e) = sched.start().await {
+        error!("Error starting scheduler: {:?}", e)
+    };
+    // sched.time_till_next_job().await;
+    // Setup loop to keep the program alive
+    let forever = task::spawn(async {
+        let mut interval = time::interval(Duration::from_secs(500));
 
-    // Wait a while so that the jobs actually run
-    tokio::time::sleep(core::time::Duration::from_secs(100)).await;
+        loop {
+            interval.tick().await;
+        }
+    });
+
+    forever.await.unwrap();
 }
