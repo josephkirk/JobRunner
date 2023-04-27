@@ -1,0 +1,14 @@
+[
+    {
+        "name": "Job1",
+        "schedule": "1/5 * * * * *",
+        "process": "cmd",
+        "command": "/C echo Hello World"
+    },
+    {
+        "name": "Job2",
+        "schedule": "1/10 * * * * *",
+        "process": "cmd",
+        "command": "/C echo Hello World 2"
+    }
+]
